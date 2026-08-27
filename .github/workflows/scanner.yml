@@ -1,0 +1,49 @@
+name: Binance RSI Divergence Scanner
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "3,8,13,18,23,28,33,38,43,48,53,58 * * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: binance-rsi-divergence
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run scanner
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          RSI_PERIOD: "14"
+          PIVOT_LEFT: "5"
+          LOOKBACK: "220"
+          MIN_QUOTE_VOLUME: "1000000"
+          MAX_SYMBOLS: "250"
+        run: python scanner.py
+
+      - name: Save alert state
+        run: |
+          git config user.name "binance-rsi-scanner"
+          git config user.email "actions@users.noreply.github.com"
+          git add state.json
+          git diff --cached --quiet || git commit -m "Update divergence alert state"
+          git push
