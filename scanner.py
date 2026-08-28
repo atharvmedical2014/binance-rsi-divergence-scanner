@@ -9,11 +9,19 @@ import pandas as pd
 BASE_URL = "https://api.binance.com"
 TELEGRAM_URL = "https://api.telegram.org/bot{}/sendMessage"
 
-TIMEFRAMES = {
+ALL_TIMEFRAMES = {
     "1H": "1h",
     "1D": "1d",
     "1W": "1w",
 }
+
+# Which timeframes to scan in this run. Set via TIMEFRAMES env var
+# (comma-separated, e.g. "1H" or "1D,1W"). Defaults to all three.
+_tf_env = os.getenv("TIMEFRAMES", "").strip()
+if _tf_env:
+    TIMEFRAMES = {k: ALL_TIMEFRAMES[k] for k in _tf_env.split(",") if k.strip() in ALL_TIMEFRAMES}
+else:
+    TIMEFRAMES = ALL_TIMEFRAMES
 
 RSI_PERIOD = int(os.getenv("RSI_PERIOD", "14"))
 PIVOT_LEFT = int(os.getenv("PIVOT_LEFT", "5"))
