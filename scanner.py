@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 import requests
 import pandas as pd
 
-BASE_URL = "https://data-api.binance.vision"
+BASE_URL = "https://api.binance.com"
 TELEGRAM_URL = "https://api.telegram.org/bot{}/sendMessage"
 
 TIMEFRAMES = {
@@ -125,15 +125,24 @@ def find_latest_divergence(df):
     low_idx = [i for i, x in enumerate(lows) if x and pd.notna(df.loc[i, "rsi"])]
     high_idx = [i for i, x in enumerate(highs) if x and pd.notna(df.loc[i, "rsi"])]
 
+    # Only alert if the signal candle closed today (IST). This stops old
+    # pivots (e.g. from days ago) from being reported as "latest".
+    IST = "Asia/Kolkata"
+    today = pd.Timestamp.now(tz=IST).date()
+
     # Need two pivot points. Compare the newest qualifying pivot with the
     # immediately previous pivot of the same type.
     if len(low_idx) >= 2:
         a, b = low_idx[-2], low_idx[-1]
-        if df.loc[b, "low"] < df.loc[a, "low"] and df.loc[b, "rsi"] > df.loc[a, "rsi"]:
+        if (
+            df.loc[b, "close_time"].tz_convert(IST).date() == today
+            and df.loc[b, "low"] < df.loc[a, "low"]
+            and df.loc[b, "rsi"] > df.loc[a, "rsi"]
+        ):
             return {
                 "type": "BULLISH",
                 "index": b,
-                "signal_time": df.loc[b, "close_time"].isoformat(),
+                "signal_time": df.loc[b, "close_time"].tz_convert(IST).isoformat(),
                 "price": float(df.loc[b, "close"]),
                 "rsi": float(df.loc[b, "rsi"]),
                 "pivot_price_1": float(df.loc[a, "low"]),
@@ -144,11 +153,15 @@ def find_latest_divergence(df):
 
     if len(high_idx) >= 2:
         a, b = high_idx[-2], high_idx[-1]
-        if df.loc[b, "high"] > df.loc[a, "high"] and df.loc[b, "rsi"] < df.loc[a, "rsi"]:
+        if (
+            df.loc[b, "close_time"].tz_convert(IST).date() == today
+            and df.loc[b, "high"] > df.loc[a, "high"]
+            and df.loc[b, "rsi"] < df.loc[a, "rsi"]
+        ):
             return {
                 "type": "BEARISH",
                 "index": b,
-                "signal_time": df.loc[b, "close_time"].isoformat(),
+                "signal_time": df.loc[b, "close_time"].tz_convert(IST).isoformat(),
                 "price": float(df.loc[b, "close"]),
                 "rsi": float(df.loc[b, "rsi"]),
                 "pivot_price_1": float(df.loc[a, "high"]),
