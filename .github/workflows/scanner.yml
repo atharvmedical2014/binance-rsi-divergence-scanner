@@ -3,7 +3,9 @@ name: Binance RSI Divergence Scanner
 on:
   workflow_dispatch:
   schedule:
-    - cron: "3,8,13,18,23,28,33,38,43,48,53,58 * * * *"
+    - cron: "1 * * * *"     # every hour, 1 min after close -> 1H timeframe
+    - cron: "5 0 * * *"     # daily at 00:05 UTC, after daily candle closes -> 1D timeframe
+    - cron: "10 0 * * 1"    # Monday 00:10 UTC, after weekly candle closes -> 1W timeframe
 
 permissions:
   contents: write
@@ -29,6 +31,16 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Determine timeframe for this run
+        id: tf
+        run: |
+          case "${{ github.event.schedule }}" in
+            "1 * * * *") echo "TF=1H" >> "$GITHUB_ENV" ;;
+            "5 0 * * *") echo "TF=1D" >> "$GITHUB_ENV" ;;
+            "10 0 * * 1") echo "TF=1W" >> "$GITHUB_ENV" ;;
+            *) echo "TF=1H,1D,1W" >> "$GITHUB_ENV" ;;
+          esac
+
       - name: Run scanner
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -38,6 +50,7 @@ jobs:
           LOOKBACK: "220"
           MIN_QUOTE_VOLUME: "1000000"
           MAX_SYMBOLS: "250"
+          TIMEFRAMES: ${{ env.TF }}
         run: python scanner.py
 
       - name: Save alert state
